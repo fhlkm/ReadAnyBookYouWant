@@ -1,27 +1,81 @@
-# Compiled class file
-*.class
+# Kotlin Multiplatform Mobile (KMM) Project .gitignore
 
-# Log file
+# Kotlin
+*.iml
+.kotlin
+
+# Gradle
+.gradle
+**/build/
+!src/**/build/
+gradle-app.setting
+!gradle-wrapper.jar
+!gradle-wrapper.properties
+
+# Android
+local.properties
+.externalNativeBuild
+.cxx
+captures
+
+# iOS
+xcuserdata
+*.xcodeproj/*
+!*.xcodeproj/project.pbxproj
+!*.xcodeproj/xcshareddata/
+!*.xcodeproj/project.xcworkspace/
+!*.xcworkspace/contents.xcworkspacedata
+**/xcshareddata/WorkspaceSettings.xcsettings
+
+# CocoaPods
+iosApp/Pods/
+iosApp/Podfile.lock
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Node.js (if using any JS tools)
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Logs
 *.log
 
-# BlueJ files
-*.ctxt
+# Temporary files
+*.tmp
+*.temp
 
-# Mobile Tools for Java (J2ME)
-.mtj.tmp/
+# KMM specific
+.konan/
+composeApp/build/
+iosApp/build/
 
-# Package Files #
-*.jar
-*.war
-*.nar
-*.ear
-*.zip
-*.tar.gz
-*.rar
+# ML Kit models (if downloaded locally)
+*.tflite
+*.lite
 
-# virtual machine crash logs, see http://www.java.com/en/download/help/error_hotspot.xml
-hs_err_pid*
-replay_pid*
+# API keys and secrets
+secrets.properties
+api-keys.properties
+.env
+.env.local
+.env.*.local
 
-# Kotlin Gradle plugin data, see https://kotlinlang.org/docs/whatsnew20.html#new-directory-for-kotlin-data-in-gradle-projects
-.kotlin/
+# Test results
+test-results/
+build/test-results/
