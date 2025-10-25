@@ -15,11 +15,14 @@ class MainActivity : ComponentActivity(), LifecycleOwner {
         enableEdgeToEdge()
         super.onCreate(savedInstanceState)
 
-        // Initialize dependency injection
-        AppModule.initialize(this, this)
-
         // Initialize permission controller early (before STARTED)
         PermissionController.init(this)
+
+        // Initialize camera launcher early (before STARTED)
+        com.book.rabyw.platform.camera.CameraLauncher.initialize(this)
+
+        // Initialize dependency injection
+        AppModule.initialize(this, this)
 
         setContent {
             App()

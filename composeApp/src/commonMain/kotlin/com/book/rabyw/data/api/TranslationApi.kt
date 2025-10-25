@@ -1,5 +1,6 @@
 package com.book.rabyw.data.api
 
+import com.book.rabyw.util.AppLogger
 import io.ktor.client.*
 import io.ktor.client.call.*
 import io.ktor.client.engine.*
@@ -24,7 +25,7 @@ data class TranslationResponse(
 )
 
 class TranslationApi {
-    
+
     private val client = HttpClient {
         install(ContentNegotiation) {
             json(Json {
@@ -51,6 +52,7 @@ class TranslationApi {
             
             Result.success(response)
         } catch (e: Exception) {
+            AppLogger.e("TranslationApi", "Translation API error: ${e.message}", e)
             Result.failure(e)
         }
     }
