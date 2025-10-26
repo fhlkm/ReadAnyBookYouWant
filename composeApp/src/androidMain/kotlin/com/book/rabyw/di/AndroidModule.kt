@@ -2,6 +2,7 @@ package com.book.rabyw.di
 
 import android.content.Context
 import androidx.lifecycle.LifecycleOwner
+import com.book.rabyw.config.AppConfig
 import com.book.rabyw.data.api.TranslationApi
 import com.book.rabyw.data.repository.TranslationRepository
 import com.book.rabyw.domain.ICameraService
@@ -33,7 +34,7 @@ actual object AppModule {
     
     actual fun provideTranslationService(): ITranslationService {
         val onDeviceService = AndroidTranslationService()
-        val serverApi = TranslationApi()
+        val serverApi = TranslationApi(AppConfig.OPENAI_API_KEY)
         return TranslationRepository(onDeviceService, serverApi)
     }
 }

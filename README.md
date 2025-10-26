@@ -10,7 +10,7 @@ A Kotlin Multiplatform mobile application that captures book pages, extracts tex
   - iOS: Apple Vision framework (supports Chinese and English)
 - 🌐 **Translation**: Translate text between Chinese and English
   - On-device: ML Kit Translation (both platforms)
-  - Server fallback: Optional high-accuracy server-side translation
+  - Server-side: OpenAI GPT API for high-accuracy translation
 - 🎨 **Modern UI**: Built with Compose Multiplatform for consistent experience
 - 📱 **Cross-Platform**: Single codebase for Android and iOS
 
@@ -31,9 +31,9 @@ A Kotlin Multiplatform mobile application that captures book pages, extracts tex
 
 - **UI Framework**: Compose Multiplatform
 - **OCR**: ML Kit Text Recognition (Android), Apple Vision (iOS)
-- **Translation**: ML Kit Translation (both platforms)
+- **Translation**: ML Kit Translation (both platforms) + OpenAI GPT-5-nano API
 - **Camera**: CameraX (Android), UIImagePickerController (iOS)
-- **Networking**: Ktor (optional server fallback)
+- **Networking**: Ktor (OpenAI API integration)
 - **State Management**: Kotlin StateFlow + ViewModel
 
 ## Setup Instructions
@@ -117,8 +117,40 @@ A Kotlin Multiplatform mobile application that captures book pages, extracts tex
 
 ## Configuration
 
+### OpenAI Translation API Setup
+
+The app now uses OpenAI's GPT API for high-accuracy server-side translation. To enable this feature:
+
+1. **Get an OpenAI API Key**
+   - Visit [OpenAI Platform](https://platform.openai.com/)
+   - Create an account and generate an API key
+   - Ensure you have sufficient credits for API usage
+
+2. **Configure the API Key**
+   
+   **Option A: Direct Configuration (Quick Setup)**
+   - Open `composeApp/src/androidMain/kotlin/com/book/rabyw/di/AndroidModule.kt`
+   - Replace `"YOUR_OPENAI_API_KEY_HERE"` with your actual API key
+   - Open `composeApp/src/iosMain/kotlin/com/book/rabyw/di/IosModule.kt`
+   - Replace `"YOUR_OPENAI_API_KEY_HERE"` with your actual API key
+
+   **Option B: Configuration File (Recommended for Production)**
+   - Copy `api-keys.properties.template` to `api-keys.properties`
+   - Replace `your_openai_api_key_here` with your actual API key
+   - Update the dependency injection modules to load the key from the configuration file
+
+3. **Usage**
+   - Select "Accurate" translation mode in the app
+   - The app will use OpenAI GPT-5-nano (cheapest model) with automatic fallback to GPT-4o-mini
+   - Translation quality is significantly higher than on-device models
+   - Cost-optimized with minimal token usage and low temperature settings
+
 ### Server-Side Translation
-To enable server-side translation, update the `TranslationApi` class with your preferred translation service:
+The app supports multiple translation services. Currently implemented:
+- **OpenAI GPT**: High-accuracy translation using GPT-5-nano (cheapest model) with GPT-4o-mini fallback
+- **On-device ML Kit**: Fast, offline translation (fallback)
+
+To add other translation services, update the `TranslationApi` class:
 
 ```kotlin
 // Example: Google Translate API
