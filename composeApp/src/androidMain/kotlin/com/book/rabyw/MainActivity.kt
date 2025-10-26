@@ -20,6 +20,9 @@ class MainActivity : ComponentActivity(), LifecycleOwner {
 
         // Initialize camera launcher early (before STARTED)
         com.book.rabyw.platform.camera.CameraLauncher.initialize(this)
+        
+        // Initialize image picker launcher early (before STARTED)
+        com.book.rabyw.platform.camera.ImagePickerLauncher.initialize(this)
 
         // Initialize dependency injection
         AppModule.initialize(this, this)

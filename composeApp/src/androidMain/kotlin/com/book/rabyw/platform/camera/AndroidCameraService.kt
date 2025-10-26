@@ -22,6 +22,7 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
 import java.io.ByteArrayOutputStream
 import java.io.File
+import com.book.rabyw.platform.camera.ImagePickerLauncher
 
 class AndroidCameraService(
     private val context: Context,
@@ -42,17 +43,7 @@ class AndroidCameraService(
     }
 
     override suspend fun captureImage(): Flow<CapturedImage?> = callbackFlow {
-        AppLogger.i(TAG, "captureImage: starting")
-        
-        if (!hasCameraPermission()) {
-            AppLogger.i(TAG, "captureImage: no camera permission")
-            trySend(null)
-            close()
-            return@callbackFlow
-        }
-
-        if (!CameraLauncher.isInitialized()) {
-            AppLogger.i(TAG, "captureImage: camera launcher not initialized")
+        if (!hasCameraPermission() || !CameraLauncher.isInitialized()) {
             trySend(null)
             close()
             return@callbackFlow
@@ -60,14 +51,12 @@ class AndroidCameraService(
 
         val activity = lifecycleOwner as? ComponentActivity
         if (activity == null) {
-            AppLogger.i(TAG, "captureImage: activity is null")
             trySend(null)
             close()
             return@callbackFlow
         }
 
         try {
-            // Create a temporary file for the photo
             val photoFile = File.createTempFile(
                 "photo_${System.currentTimeMillis()}",
                 ".jpg",
@@ -80,46 +69,32 @@ class AndroidCameraService(
                 photoFile
             )
             
-            AppLogger.i(TAG, "captureImage: launching camera with URI: $uri")
-            
-            // Launch camera and wait for result
             val success = CameraLauncher.takePicture(uri)
-            
-            AppLogger.i(TAG, "captureImage: camera result: $success")
             
             if (success) {
                 try {
-                    AppLogger.i(TAG, "captureImage: processing captured image")
                     val bitmap = MediaStore.Images.Media.getBitmap(
                         activity.contentResolver,
                         uri
                     )
-                    // Fix orientation based on EXIF data
                     val rotatedBitmap = fixImageOrientation(bitmap, photoFile)
                     val capturedImage = convertBitmapToCapturedImage(rotatedBitmap)
-                    AppLogger.i(TAG, "captureImage: image processed successfully")
                     trySend(capturedImage)
                 } catch (e: Exception) {
                     AppLogger.e(TAG, "captureImage: error processing image: ${e.message}")
-                    e.printStackTrace()
                     trySend(null)
                 }
             } else {
-                AppLogger.i(TAG, "captureImage: camera capture failed")
                 trySend(null)
             }
         } catch (e: Exception) {
             AppLogger.e(TAG, "captureImage: error: ${e.message}")
-            e.printStackTrace()
             trySend(null)
         } finally {
-            AppLogger.i(TAG, "captureImage: closing flow")
             close()
         }
 
-        awaitClose {
-            AppLogger.i(TAG, "captureImage: flow closed")
-        }
+        awaitClose { }
     }
 
     /**
@@ -167,6 +142,85 @@ class AndroidCameraService(
         } catch (e: Exception) {
             return bitmap
         }
+    }
+
+    override suspend fun loadImage(): Flow<CapturedImage?> = callbackFlow {
+        val activity = lifecycleOwner as? ComponentActivity
+        if (activity == null) {
+            trySend(null)
+            close()
+            return@callbackFlow
+        }
+
+        if (!PermissionController.hasStoragePermission(activity)) {
+            val granted = PermissionController.requestStoragePermission(activity)
+            if (!granted) {
+                trySend(null)
+                close()
+                return@callbackFlow
+            }
+        }
+
+        if (!ImagePickerLauncher.isInitialized()) {
+            trySend(null)
+            close()
+            return@callbackFlow
+        }
+
+        try {
+            val selectedUri = ImagePickerLauncher.pickImage()
+            
+            if (selectedUri != null) {
+                try {
+                    val bitmap = MediaStore.Images.Media.getBitmap(
+                        activity.contentResolver,
+                        selectedUri
+                    )
+                    
+                    // Try to get EXIF data directly from content resolver
+                    val rotatedBitmap = try {
+                        activity.contentResolver.openInputStream(selectedUri)?.use { inputStream ->
+                            val exif = ExifInterface(inputStream)
+                            val orientation = exif.getAttributeInt(
+                                ExifInterface.TAG_ORIENTATION,
+                                ExifInterface.ORIENTATION_NORMAL
+                            )
+                            if (orientation != ExifInterface.ORIENTATION_NORMAL) {
+                                // Create temp file for orientation fix
+                                val tempFile = File.createTempFile("temp_", ".jpg", context.cacheDir)
+                                activity.contentResolver.openInputStream(selectedUri)?.use { stream ->
+                                    tempFile.outputStream().use { output ->
+                                        stream.copyTo(output)
+                                    }
+                                }
+                                fixImageOrientation(bitmap, tempFile).also {
+                                    tempFile.delete()
+                                }
+                            } else {
+                                bitmap
+                            }
+                        } ?: bitmap
+                    } catch (e: Exception) {
+                        bitmap
+                    }
+                    
+                    val capturedImage = convertBitmapToCapturedImage(rotatedBitmap)
+                    trySend(capturedImage)
+                } catch (e: Exception) {
+                    AppLogger.e(TAG, "loadImage: error processing image: ${e.message}")
+                    trySend(null)
+                }
+            } else {
+                trySend(null)
+            }
+        } catch (e: Exception) {
+            AppLogger.e(TAG, "loadImage: error: ${e.message}")
+            trySend(null)
+        } finally {
+            close()
+        }
+
+        awaitClose { }
     }
 
     private fun convertBitmapToCapturedImage(bitmap: Bitmap): CapturedImage {

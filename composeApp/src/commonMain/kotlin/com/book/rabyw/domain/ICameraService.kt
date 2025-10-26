@@ -11,6 +11,12 @@ interface ICameraService {
     suspend fun captureImage(): Flow<CapturedImage?>
     
     /**
+     * Loads an image from the device gallery/photo library
+     * @return Flow that emits the loaded image or null if selection was cancelled
+     */
+    suspend fun loadImage(): Flow<CapturedImage?>
+    
+    /**
      * Checks if camera permission is granted
      */
     suspend fun hasCameraPermission(): Boolean

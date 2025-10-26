@@ -5,6 +5,10 @@
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     
+    <!-- Storage permissions for gallery access -->
+    <uses-permission android:name="android.permission.READ_MEDIA_IMAGES" android:minSdkVersion="33" />
+    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" android:maxSdkVersion="32" />
+    
     <!-- This line declares that the app uses the device's camera hardware feature,
          but sets required="false" to indicate it's not mandatory.
          This means the app can still be installed on devices without a camera -->

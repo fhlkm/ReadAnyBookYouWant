@@ -11,7 +11,6 @@ import com.book.rabyw.domain.models.RecognizedText
 import com.book.rabyw.domain.models.TranslationMode
 import com.book.rabyw.domain.models.TranslationResult
 import com.book.rabyw.util.AppLogger
-import io.ktor.util.logging.Logger
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -23,7 +22,6 @@ data class BookReaderUiState(
     val capturedImage: CapturedImage? = null,
     val recognizedText: RecognizedText? = null,
     val translationResult: TranslationResult? = null,
-    val translateAlignJsonError: String? = null,
     val sourceLanguage: Language = Language.ENGLISH,
     val targetLanguage: Language = Language.CHINESE_SIMPLIFIED,
     val translationMode: TranslationMode = TranslationMode.FAST,
@@ -75,6 +73,25 @@ class BookReaderViewModel(
                         isLoading = false
                     )
                     // Automatically process OCR after image capture
+                    processOcr(image)
+                } else {
+                    _uiState.value = _uiState.value.copy(isLoading = false)
+                }
+            }
+        }
+    }
+
+    fun loadImage() {
+        viewModelScope.launch {
+            _uiState.value = _uiState.value.copy(isLoading = true, error = null)
+            
+            cameraService.loadImage().collect { image ->
+                if (image != null) {
+                    _uiState.value = _uiState.value.copy(
+                        capturedImage = image,
+                        isLoading = false
+                    )
+                    // Automatically process OCR after image load
                     processOcr(image)
                 } else {
                     _uiState.value = _uiState.value.copy(isLoading = false)
