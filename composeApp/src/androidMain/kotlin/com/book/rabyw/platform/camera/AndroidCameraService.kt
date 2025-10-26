@@ -15,6 +15,8 @@ import androidx.lifecycle.LifecycleOwner
 import com.book.rabyw.domain.ICameraService
 import com.book.rabyw.domain.models.CapturedImage
 import com.book.rabyw.platform.permissions.PermissionController
+import com.book.rabyw.ui.TAG
+import com.book.rabyw.util.AppLogger
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
@@ -40,13 +42,17 @@ class AndroidCameraService(
     }
 
     override suspend fun captureImage(): Flow<CapturedImage?> = callbackFlow {
+        AppLogger.i(TAG, "captureImage: starting")
+        
         if (!hasCameraPermission()) {
+            AppLogger.i(TAG, "captureImage: no camera permission")
             trySend(null)
             close()
             return@callbackFlow
         }
 
         if (!CameraLauncher.isInitialized()) {
+            AppLogger.i(TAG, "captureImage: camera launcher not initialized")
             trySend(null)
             close()
             return@callbackFlow
@@ -54,6 +60,7 @@ class AndroidCameraService(
 
         val activity = lifecycleOwner as? ComponentActivity
         if (activity == null) {
+            AppLogger.i(TAG, "captureImage: activity is null")
             trySend(null)
             close()
             return@callbackFlow
@@ -72,12 +79,17 @@ class AndroidCameraService(
                 "${context.packageName}.fileprovider",
                 photoFile
             )
-
+            
+            AppLogger.i(TAG, "captureImage: launching camera with URI: $uri")
+            
             // Launch camera and wait for result
             val success = CameraLauncher.takePicture(uri)
-
+            
+            AppLogger.i(TAG, "captureImage: camera result: $success")
+            
             if (success) {
                 try {
+                    AppLogger.i(TAG, "captureImage: processing captured image")
                     val bitmap = MediaStore.Images.Media.getBitmap(
                         activity.contentResolver,
                         uri
@@ -85,21 +97,28 @@ class AndroidCameraService(
                     // Fix orientation based on EXIF data
                     val rotatedBitmap = fixImageOrientation(bitmap, photoFile)
                     val capturedImage = convertBitmapToCapturedImage(rotatedBitmap)
+                    AppLogger.i(TAG, "captureImage: image processed successfully")
                     trySend(capturedImage)
                 } catch (e: Exception) {
+                    AppLogger.e(TAG, "captureImage: error processing image: ${e.message}")
+                    e.printStackTrace()
                     trySend(null)
                 }
             } else {
+                AppLogger.i(TAG, "captureImage: camera capture failed")
                 trySend(null)
             }
         } catch (e: Exception) {
+            AppLogger.e(TAG, "captureImage: error: ${e.message}")
+            e.printStackTrace()
             trySend(null)
         } finally {
+            AppLogger.i(TAG, "captureImage: closing flow")
             close()
         }
 
         awaitClose {
-            // Cleanup if needed
+            AppLogger.i(TAG, "captureImage: flow closed")
         }
     }
 

@@ -2,6 +2,7 @@ package com.book.rabyw.data.repository
 
 import com.book.rabyw.data.api.TranslationApi
 import com.book.rabyw.domain.ITranslationService
+import com.book.rabyw.alignment.TranslateAlignResponse
 import com.book.rabyw.domain.models.Language
 import com.book.rabyw.domain.models.TranslationMode
 import com.book.rabyw.domain.models.TranslationResult
@@ -39,7 +40,8 @@ class TranslationRepository(
                             sourceLanguage = sourceLanguage,
                             targetLanguage = targetLanguage,
                             mode = mode,
-                            confidence = response.confidence
+                            confidence = response.confidence,
+                            translateAlign = response.translateAlign
                         )
                     )
                 } else {

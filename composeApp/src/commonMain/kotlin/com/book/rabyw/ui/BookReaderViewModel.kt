@@ -10,19 +10,22 @@ import com.book.rabyw.domain.models.Language
 import com.book.rabyw.domain.models.RecognizedText
 import com.book.rabyw.domain.models.TranslationMode
 import com.book.rabyw.domain.models.TranslationResult
+import com.book.rabyw.util.AppLogger
+import io.ktor.util.logging.Logger
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
-
+val TAG="BookReaderViewModel"
 data class BookReaderUiState(
     val isLoading: Boolean = false,
     val error: String? = null,
     val capturedImage: CapturedImage? = null,
     val recognizedText: RecognizedText? = null,
     val translationResult: TranslationResult? = null,
-    val sourceLanguage: Language = Language.AUTO_DETECT,
-    val targetLanguage: Language = Language.ENGLISH,
+    val translateAlignJsonError: String? = null,
+    val sourceLanguage: Language = Language.ENGLISH,
+    val targetLanguage: Language = Language.CHINESE_SIMPLIFIED,
     val translationMode: TranslationMode = TranslationMode.FAST,
     val isCameraPermissionGranted: Boolean = false,
     val isProcessingOcr: Boolean = false,
@@ -84,6 +87,7 @@ class BookReaderViewModel(
         val imageToProcess = image ?: _uiState.value.capturedImage
         if (imageToProcess == null) return
 
+        AppLogger.i(TAG,"processOcr: $imageToProcess")
         viewModelScope.launch {
             _uiState.value = _uiState.value.copy(isProcessingOcr = true, error = null)
             

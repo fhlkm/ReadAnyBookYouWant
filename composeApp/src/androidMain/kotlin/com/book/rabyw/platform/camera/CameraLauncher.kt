@@ -32,14 +32,22 @@ object CameraLauncher {
      * @return true if photo was taken successfully, false otherwise
      */
     suspend fun takePicture(uri: Uri): Boolean {
-        val deferred = CompletableDeferred<Boolean>()
-        currentDeferred = deferred
+        return try {
+            val deferred = CompletableDeferred<Boolean>()
+            currentDeferred = deferred
 
-        launcher?.launch(uri) ?: run {
-            deferred.complete(false)
+            launcher?.launch(uri) ?: run {
+                deferred.complete(false)
+                return false
+            }
+
+            deferred.await()
+        } catch (e: Exception) {
+            e.printStackTrace()
+            currentDeferred?.complete(false)
+            currentDeferred = null
+            false
         }
-
-        return deferred.await()
     }
 
     fun isInitialized(): Boolean = launcher != null

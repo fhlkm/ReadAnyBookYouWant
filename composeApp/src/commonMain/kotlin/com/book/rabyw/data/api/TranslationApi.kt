@@ -1,6 +1,7 @@
 package com.book.rabyw.data.api
 
 import com.book.rabyw.util.AppLogger
+import com.book.rabyw.alignment.TranslateAlignResponse
 import io.ktor.client.*
 import io.ktor.client.call.*
 import io.ktor.client.engine.*
@@ -16,7 +17,7 @@ data class OpenAITranslationRequest(
     val model: String,
     val messages: List<OpenAIMessage>,
     val temperature: Double = 0.1,
-    val max_tokens: Int = 500
+    val max_tokens: Int = 2000
 )
 
 @Serializable
@@ -53,7 +54,8 @@ data class TranslationRequest(
 @Serializable
 data class TranslationResponse(
     val translatedText: String,
-    val confidence: Float? = null
+    val confidence: Float? = null,
+    val translateAlign: TranslateAlignResponse? = null
 )
 
 class TranslationApi(
@@ -80,7 +82,7 @@ class TranslationApi(
             
             val prompt = buildTranslationPrompt(text, sourceLanguage, targetLanguage)
             val request = OpenAITranslationRequest(
-                model = "gpt-5-nano",
+                model = "gpt-4o-mini",
                 messages = listOf(
                     OpenAIMessage(role = "user", content = prompt)
                 )
@@ -142,8 +144,22 @@ class TranslationApi(
             
             // Check for successful response
             if (response.choices != null && response.choices.isNotEmpty()) {
-                val translatedText = response.choices.first().message.content.trim()
-                Result.success(TranslationResponse(translatedText = translatedText))
+                val content = response.choices.first().message.content.trim()
+                // Try to parse translate+align JSON first
+                val parsed = runCatching {
+                    Json { ignoreUnknownKeys = true }.decodeFromString(
+                        TranslateAlignResponse.serializer(), content
+                    )
+                }
+                val ta = parsed.getOrThrow()
+
+                return Result.success(
+                    TranslationResponse(
+                        translatedText = ta.translation,
+                        confidence = null,
+                        translateAlign = ta
+                    )
+                )
             } else {
                 AppLogger.e("TranslationApi", "No choices in OpenAI response")
                 Result.failure(Exception("No translation response from OpenAI"))
@@ -155,15 +171,84 @@ class TranslationApi(
     }
     
     private fun buildTranslationPrompt(text: String, sourceLanguage: String, targetLanguage: String): String {
-        val sourceLangName = getLanguageName(sourceLanguage)
-        val targetLangName = getLanguageName(targetLanguage)
-        
-        return """
-            Translate the following text from $sourceLangName to $targetLangName. 
-            Only return the translated text, nothing else. Do not include any explanations or additional text.
+        return (
+            """
+            You are a bilingual alignment expert.
+            Task: Translate the source text into the target language AND produce phrase-level alignment between the source and your translation.
+            Return ONLY valid minified JSON exactly matching this schema (no prose):
+            {"source_language":string,"target_language":string,"translation":string,"alignment":[{"source":{"start_char":number,"end_char":number,"text":string},"target":{"start_char":number,"end_char":number,"text":string},"confidence":number}]}
             
-            Text to translate: $text
-        """.trimIndent()
+            Constraints:
+            - Character indices are 0-based, end-exclusive, using UTF-16 code units (Kotlin) for BOTH source and target.
+            - Phrases must be contiguous, ordered, and non-overlapping; merge function words with adjacent content.
+            - Omit punctuation-only groups. All span texts must be exact substrings of the provided texts.
+            - Use the given language identifiers verbatim.
+            - Granularity: Do NOT output a single alignment covering the whole text. Create fine-grained phrase pairs.
+              • For short sentences: at least 3–6 pairs per sentence when possible.
+              • For long passages (>300 chars): aim for 12–60 pairs overall.
+              • Max span size: CJK ≤ 16 characters; space-delimited languages ≤ 6 words per span.
+              • No single pair may cover >25% of the source characters; split it.
+              • Cover ~90% of content characters across pairs.
+            - Guidance: split by clauses, noun/verb phrases, named entities, numbers, units, dates, idioms; keep pairs semantically coherent.
+            
+            Source language: $sourceLanguage
+            Target language: $targetLanguage
+            
+            Source text:
+            $text
+            """
+        ).trimIndent()
+    }
+
+    private fun buildAlignmentOnlyPrompt(sourceText: String, targetText: String, sourceLanguage: String, targetLanguage: String): String {
+        return (
+            """
+            You are a bilingual alignment expert.
+            Task: Produce phrase-level alignment ONLY for the given source and target texts (do not re-translate). Return ONLY valid minified JSON exactly matching this schema (no prose):
+            {"source_language":string,"target_language":string,"translation":string,"alignment":[{"source":{"start_char":number,"end_char":number,"text":string},"target":{"start_char":number,"end_char":number,"text":string},"confidence":number}]}
+            
+            Constraints:
+            - Use the provided source and target texts verbatim; do not alter them.
+            - Character indices are 0-based, end-exclusive, UTF-16 (Kotlin).
+            - Fine-grained alignment required; do not output one giant span. Max CJK span 12 chars; max space-delimited span 5 words; no span covers >15% of the source.
+            - Aim to cover ~90% of content characters. Phrases are contiguous, ordered, non-overlapping. Omit punctuation-only groups. Do not cross major punctuation.
+            
+            Source language: $sourceLanguage
+            Target language: $targetLanguage
+            
+            Source text:
+            $sourceText
+            
+            Target text:
+            $targetText
+            """
+        ).trimIndent()
+    }
+
+    private fun buildAlignmentOnlyPromptGranular(sourceText: String, targetText: String, sourceLanguage: String, targetLanguage: String): String {
+        return (
+            """
+            You are a bilingual alignment expert.
+            Task: Produce FINE-GRAINED phrase-level alignment ONLY. Return ONLY minified JSON EXACTLY in this schema (no prose):
+            {"source_language":string,"target_language":string,"translation":string,"alignment":[{"source":{"start_char":number,"end_char":number,"text":string},"target":{"start_char":number,"end_char":number,"text":string},"confidence":number}]}
+            
+            Hard constraints (must satisfy):
+            - Character indices are 0-based, end-exclusive, UTF-16 (Kotlin).
+            - Do not output sentence-level spans. Max CJK span 10 chars; max space-delimited span 4 words.
+            - Each sentence should have 4–10 pairs when possible; entire text 24–120 pairs depending on length.
+            - No single pair covers >10% of source characters. Avoid crossing major punctuation (.,!?; 。！？；).
+            - Cover ~90% of content characters; omit punctuation-only.
+            
+            Source language: $sourceLanguage
+            Target language: $targetLanguage
+            
+            Source text:
+            $sourceText
+            
+            Target text:
+            $targetText
+            """
+        ).trimIndent()
     }
     
     private fun getLanguageName(languageCode: String): String {

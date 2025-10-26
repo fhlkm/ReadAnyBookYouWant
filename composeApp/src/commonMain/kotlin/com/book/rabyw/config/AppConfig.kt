@@ -9,5 +9,5 @@ package com.book.rabyw.config
 object AppConfig {
     // TODO: Replace with your actual OpenAI API key
     // Get your API key from: https://platform.openai.com/api-keys
-    const val OPENAI_API_KEY = "YOUR_OPENAI_API_KEY_HERE"
+    const val OPENAI_API_KEY = ""
 }

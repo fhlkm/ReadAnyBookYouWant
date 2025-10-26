@@ -1,5 +1,6 @@
 package com.book.rabyw.domain.models
 
+import com.book.rabyw.alignment.TranslateAlignResponse
 import kotlinx.serialization.Serializable
 
 @Serializable
@@ -30,5 +31,6 @@ data class TranslationResult(
     val targetLanguage: Language,
     val mode: TranslationMode,
     val confidence: Float? = null,
-    val timestamp: Long = getCurrentTimeMillis()
+    val timestamp: Long = getCurrentTimeMillis(),
+    val translateAlign: TranslateAlignResponse? = null
 )
