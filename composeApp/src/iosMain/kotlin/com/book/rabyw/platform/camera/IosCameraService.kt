@@ -2,14 +2,22 @@ package com.book.rabyw.platform.camera
 
 import com.book.rabyw.domain.ICameraService
 import com.book.rabyw.domain.models.CapturedImage
+import kotlinx.cinterop.ExperimentalForeignApi
+import kotlinx.cinterop.ByteVar
+import kotlinx.cinterop.addressOf
+import kotlinx.cinterop.reinterpret
+import kotlinx.cinterop.useContents
+import kotlinx.cinterop.usePinned
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.suspendCancellableCoroutine
-import kotlinx.cinterop.ExperimentalForeignApi
 import platform.AVFoundation.*
 import platform.Foundation.NSData
+import platform.CoreGraphics.CGSize
+import platform.darwin.NSObject
 import platform.UIKit.*
+import platform.posix.memcpy
 import kotlin.coroutines.resume
 
 class IosCameraService(
@@ -39,11 +47,13 @@ class IosCameraService(
         }
     }
 
+    @OptIn(ExperimentalForeignApi::class)
     override suspend fun captureImage(): Flow<CapturedImage?> =
-        launchImagePicker(UIImagePickerControllerSourceTypeCamera)
+        launchImagePicker(UIImagePickerControllerSourceType.UIImagePickerControllerSourceTypeCamera)
 
+    @OptIn(ExperimentalForeignApi::class)
     override suspend fun loadImage(): Flow<CapturedImage?> =
-        launchImagePicker(UIImagePickerControllerSourceTypePhotoLibrary)
+        launchImagePicker(UIImagePickerControllerSourceType.UIImagePickerControllerSourceTypePhotoLibrary)
     
     @OptIn(ExperimentalForeignApi::class)
     private fun launchImagePicker(sourceType: UIImagePickerControllerSourceType): Flow<CapturedImage?> = callbackFlow {
@@ -62,12 +72,14 @@ class IosCameraService(
             if (image != null) {
                 try {
                     val imageData = UIImageJPEGRepresentation(image, 0.9)
-                    val byteArray = NSDataToByteArray(imageData)
+                    val byteArray = imageData.toByteArray()
                     
+                    val size: CGSize = image.size.useContents { this }
+
                     val capturedImage = CapturedImage(
                         imageData = byteArray,
-                        width = image.size.width.toInt(),
-                        height = image.size.height.toInt()
+                        width = size.width.toInt(),
+                        height = size.height.toInt()
                     )
                     
                     trySend(capturedImage)
@@ -93,12 +105,17 @@ class IosCameraService(
         }
     }
     
-    private fun NSDataToByteArray(nsData: NSData?): ByteArray {
-        if (nsData == null) return ByteArray(0)
-        val length = nsData.length.toInt()
+    @OptIn(ExperimentalForeignApi::class)
+    private fun NSData?.toByteArray(): ByteArray {
+        val data = this ?: return ByteArray(0)
+        val length = data.length.toInt()
         val byteArray = ByteArray(length)
-        val bytes = byteArray.usePinned { it.addressOf(0) }
-        nsData.getBytes(bytes, platform.posix.nav.C.NS(length))
+        val source = data.bytes?.reinterpret<ByteVar>()
+        if (source != null) {
+            byteArray.usePinned { pinned ->
+                memcpy(pinned.addressOf(0), source, data.length)
+            }
+        }
         return byteArray
     }
 }
@@ -112,7 +129,7 @@ private class ImagePickerDelegate(
         picker: UIImagePickerController,
         didFinishPickingMediaWithInfo: Map<Any?, *>
     ) {
-        val image = didFinishPickingMediaWithInfo[UIImagePickerControllerInfoOriginalImageKey] as? UIImage
+        val image = didFinishPickingMediaWithInfo[UIImagePickerControllerOriginalImage] as? UIImage
         onImageSelected(image)
     }
     
